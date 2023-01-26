@@ -1,4 +1,7 @@
 #include "rpcprovider.h"
+#include <google/protobuf/message.h>
+#include <google/protobuf/stubs/callback.h>
+#include <muduo/net/Callbacks.h>
 #include <string>
 #include "mprpcapplication.h"
 #include "mprpcconfig.h"
@@ -90,4 +93,34 @@ void RpcProvider::OnMessage(const muduo::net::TcpConnectionPtr &conn,
         std::cout << service_name << " is not exist!" << std::endl;
         return;
     }
+
+    auto mit = it -> second.m_methodMap.find(method_name);
+    if (mit == it -> second.m_methodMap.end()) {
+        std::cout << service_name << ":" << method_name << " is not exist!" << std::endl;
+        return;
+    }
+
+    google::protobuf::Service *service = it -> second.m_service;
+    const google::protobuf::MethodDescriptor *method = mit -> second;
+
+    google::protobuf::Message *request = service -> GetRequestPrototype(method).New();
+
+    if (!request -> ParseFromString(args_str)) {
+        std::cout << "request parse error, content:" << args_str << std::endl;
+        return;
+    }
+
+    google::protobuf::Message *response = service -> GetResponsePrototype(method).New();
+
+    google::protobuf::Closure *done = google::protobuf::NewCallback<RpcProvider,
+                                                                    const muduo::net::TcpConnectionPtr&,
+                                                                    google::protobuf::Message*>
+                                                                    (this,
+                                                                    &RpcProvider::SendRpcResponse,
+                                                                    conn, response);
+    service -> CallMethod(method, nullptr, request, response, done);
+}
+
+void RpcProvider::SendRpcResponse(const muduo::net::TcpConnectionPtr& conn, google::protobuf::Message* response){
+    
 }

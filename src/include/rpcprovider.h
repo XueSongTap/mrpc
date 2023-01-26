@@ -1,6 +1,8 @@
 #pragma once
 #include "google/protobuf/service.h"
+#include <google/protobuf/message.h>
 #include <memory>
+#include <muduo/net/Callbacks.h>
 #include <muduo/net/TcpServer.h>
 #include <muduo/net/EventLoop.h>
 #include <muduo/net/InetAddress.h>
@@ -21,4 +23,6 @@ private:
 
     void OnConnection(const muduo::net::TcpConnectionPtr&);
     void OnMessage(const muduo::net::TcpConnectionPtr&, muduo::net::Buffer*, muduo::Timestamp);
+    void SendRpcResponse(const muduo::net::TcpConnectionPtr&, google::protobuf::Message*);
+    
 };
