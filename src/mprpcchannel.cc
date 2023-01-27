@@ -11,6 +11,9 @@
 #include <netinet/in.h>
 #include <unistd.h>
 
+
+// header_size + service_name method_name args_size + args
+
 void MprpcChannel::CallMethod(const google::protobuf::MethodDescriptor* method,
                                 google::protobuf::RpcController* controller, 
                                 const google::protobuf::Message* request,
@@ -18,10 +21,13 @@ void MprpcChannel::CallMethod(const google::protobuf::MethodDescriptor* method,
                                 google::protobuf:: Closure* done){
     
     const google::protobuf::ServiceDescriptor* sd = method -> service();
-    std::string service_name = sd->name();
-    std::string method_name = method -> name();
+    std::string service_name = sd->name(); // service_name
+    std::string method_name = method->name(); // method_name
+    std::cout << "service name:" << service_name << std::endl;
+    std::cout << "method_name:" << method_name << std::endl;
+    std::cout << "finish get name" << std::endl;
     // 获取参数的序列化字符串长度 args_size
-    int args_size = 0;
+    uint32_t args_size = 0;
     std::string args_str;
     if (request -> SerializeToString(&args_str)) {
         args_size = args_str.size();
@@ -29,16 +35,16 @@ void MprpcChannel::CallMethod(const google::protobuf::MethodDescriptor* method,
         std::cout << "serialize request error : " << std::endl;
         return;
     }
+
+    std::cout << "finish get args_size" << std::endl;
     // 定义rpc的请求header
     mprpc::RpcHeader rpcHeader;
-
     rpcHeader.set_service_name(service_name);
     rpcHeader.set_method_name(method_name);
-
     rpcHeader.set_args_size(args_size);
-
+    std::cout << "finish set service method args_size" << std::endl;
     std::string rpc_header_str;
-    uint32_t header_size;
+    uint32_t header_size = 0;
     if (rpcHeader.SerializeToString(&rpc_header_str)){
         header_size = rpc_header_str.size();
     }else {
@@ -48,7 +54,7 @@ void MprpcChannel::CallMethod(const google::protobuf::MethodDescriptor* method,
 
     std::string send_rpc_str;
 
-    send_rpc_str.insert(0, std::string((char*)&header_size), 4);
+    send_rpc_str.insert(0, std::string((char*)&header_size, 4));
     send_rpc_str += rpc_header_str;
     send_rpc_str += args_str;
     // 打印调试信息
@@ -66,6 +72,7 @@ void MprpcChannel::CallMethod(const google::protobuf::MethodDescriptor* method,
         std::cout << "create socket error! errno:" << errno << std::endl;
         close(clientfd);
         exit(EXIT_FAILURE);
+        return;
     }
     std::string ip = MprpcApplication::GetInstance().GetConfig().Load("rpcserverip");
     uint16_t port = atoi(MprpcApplication::GetInstance().GetConfig().Load("rpcserverport").c_str());
@@ -90,11 +97,10 @@ void MprpcChannel::CallMethod(const google::protobuf::MethodDescriptor* method,
     }
 
     std::string response_str(recv_buf, 0, recv_size);
-    if (response -> ParseFromString(response_str)) {
+    if (!response->ParseFromArray(recv_buf, recv_size)) {
         std::cout <<  "parse error! response_str: " << response_str << std::endl;        
         close(clientfd);
         return;
     }
     close(clientfd);
-
 }
